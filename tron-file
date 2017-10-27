@@ -1,0 +1,257 @@
+import turtle
+import math
+import random
+import time
+#import pygame
+#this is just commented out because it's not needed yet. when i get the reset working
+#then I'll worry about the mouseclick event 
+
+#Set up screen plus color
+window_height = 200
+window_width = 200
+board_width_cells = 100
+#The board resolution gives double what is requested (800 instead of 400) so this fixes it
+scalefactor = (window_width*2) / board_width_cells
+
+wn = turtle.Screen()
+wn.listen()
+wn.screensize(window_height,window_width)
+wn.bgcolor("black")
+wn.title("TRON")
+pygame.init()
+
+
+class Score:
+    def __init__(self, colour, yposition):
+        self.score_keeper = turtle.Turtle()
+        self.score_keeper.speed(0)
+        self.score_keeper.color(colour)
+        self.score_keeper.pensize(3)
+        self.score_keeper.penup()
+        self.score_keeper.hideturtle()
+        self.score_keeper.setposition(-295, yposition)
+        self.score_keeper.pendown()
+        self.score = 0
+        self.original_score = 0
+        self.printscore()
+        self.reset()
+
+    #This function will restart the score when playing a new game    
+    def reset(self):
+        if self.score == 3:
+            self.score_keeper.clear()
+        self.score = self.original_score
+        score = self.score
+        self.setscore(score)
+        
+    def printscore(self):
+        scorestring = "Score: %s" %self.score
+        self.score_keeper.write(scorestring, False, align="left", font=("Impact",18, "normal"))
+
+    def setscore(self, amount):
+        self.score = amount
+        self.score_keeper.undo()
+        self.printscore()
+        
+        
+#This class sets up collision detection using a 2D Array, and draws the game border
+class Board:
+    def __init__(self, width, height):
+        self.players = []
+        self.scores = []
+        self.width = width
+        self.height = height
+        self.reset()
+        
+    def reset(self):
+        print("Board Reset")
+        for Player in self.players:
+            Player.reset()
+
+        self.board = [[0 for _ in range(self.width)] for _ in range(self.height)]
+        self.turtle = turtle.Turtle()
+
+        #This is the logical game border
+        for col in range(self.width):
+           self.board[0][col] = -1
+           self.board[self.height-1][col] = -1
+
+        for row in range(self.height):
+           self.board[row][0] = -1
+           self.board[row][self.width-1] = -1
+           
+        #This is the drawn game border:
+        self.turtle.speed(0)
+        self.turtle.penup()
+        self.turtle.hideturtle()
+        self.turtle.color("magenta")
+        self.turtle.pensize(scalefactor)
+        self.turtle.setposition(-window_width, -window_height)
+        self.turtle.pendown()
+        self.turtle.setposition(window_width, -window_height)
+        self.turtle.setposition(window_width,  window_height)
+        self.turtle.setposition(-window_width, window_height)
+        self.turtle.setposition(-window_width, -window_height)
+
+    #NEW CODE, sets the title of the game
+        self.turtle.speed(0)
+        self.turtle.hideturtle()
+        self.turtle.penup()
+        self.turtle.backward(10)
+        self.turtle.left(90)
+        self.turtle.forward(425)
+        self.turtle.right(90)
+        self.turtle.forward(110)
+        self.turtle.pendown()
+        self.turtle.color("magenta")
+        self.turtle.write("TRON LIGHT CYCLES", font=("Impact", 25, "normal"))
+
+    #This method sets up a new game
+    def new_game(self):
+        for Score in self.scores:
+            Score.reset()
+        self.reset()
+        for Player in self.players:
+            Player.reset()
+        print("New Game")
+
+
+    #This function aligns the 2D array cells with the screen resolution so they match up
+    def board_to_screen(self, x, y):
+        screenx = (x * scalefactor) - (window_width)
+        screeny = (window_height) - (y * scalefactor)
+        return (screenx, screeny)
+    
+    #This function opens the board on the screen
+    def open(self):
+        self.screen = turtle.Screen()
+        self.screen.colormode(255)
+        self.screen.screensize(self.width*scalefactor, self.height*scalefactor)
+        
+    #This function creates a player for the game
+    def add_player(self, player):
+        self.players.append(player)
+        self.scores.append(Score(player.colour, 220+(20*len(self.players))))
+
+    #This function checks the array for empty cells- if the cell is empty the player can
+    #move to the cell, if the cell is full the player crashes (collision detection)
+    def can_I_go_here(self, player):
+        if self.board[player.y][player.x] != 0:
+            if self.players[0] == player:
+                self.players[1].score += 1
+                self.scores[1].setscore(self.players[1].score)
+            else:
+                self.players[0].score += 1
+                self.scores[0].setscore(self.players[0].score) 
+            return False
+        else:
+            return True
+    
+    #this function stores the players position in the board so collision detection works
+    def player_at(self, playernum, x, y):
+        self.board[y][x] = playernum
+        
+#This class sets up the player and assigns keys to player controls.
+class Player:
+    def __init__(self, playernum, x, y, direction, board, colour, keys):
+         self.x = x
+         self.y = y
+         self.original_x = x
+         self.original_y = y
+         self.playernum = playernum
+         self.direction = direction
+         self.original_direction = direction
+         self.board = board
+         self.map_keys(keys)
+         self.score = 0
+         self.colour = colour
+         self.turtle = None
+         board.add_player(self)
+         self.reset()
+
+    def reset(self):
+         if self.turtle != None:
+            self.turtle.clear()
+         self.x = self.original_x
+         self.y = self.original_y
+         self.direction = self.original_direction
+         self.board.player_at(self.playernum, self.x, self.y)
+         self.turtle = turtle.Turtle()
+         self.turtle.speed(8)
+         self.turtle.color(self.colour)
+         self.turtle.pensize(scalefactor)
+         self.turtle.hideturtle()
+         self.turtle.penup()
+         self.move()
+         self.turtle.pendown()
+
+    def go_up(self):
+        self.direction = "up"
+
+    def go_down(self):
+        self.direction = "down"
+
+    def go_left(self):
+        self.direction = "left"
+
+    def go_right(self):
+        self.direction = "right"
+        
+    def map_keys(self, keys):
+        wn.onkey(self.go_up, keys[0])
+        wn.onkey(self.go_down, keys[1])
+        wn.onkey(self.go_left, keys[2])
+        wn.onkey(self.go_right, keys[3])
+
+    def think(self):
+        if self.direction == "up":
+            self.y -= 1
+
+        if self.direction == "down":
+            self.y += 1
+
+        if self.direction == "left":
+            self.x -= 1
+
+        if self.direction == "right":
+            self.x += 1
+
+        return self.board.can_I_go_here(self)
+
+    def move(self):
+        self.board.player_at(self.playernum, self.x, self.y)
+        screenx = (self.x * scalefactor) - (window_width)
+        screeny = (window_height) - (self.y * scalefactor)
+        #print("player %d, (%d,%d)" %(self.playernum, screenx, screeny))
+        self.turtle.setposition(screenx, screeny)
+        
+
+#This is the actual game play program   
+board = Board(board_width_cells, board_width_cells)
+p1 = Player(2, 5, 5, "down", board, "yellow",["w","s","a","d"])
+p2 = Player(1, board_width_cells - 5, board_width_cells - 5, "up", board, "cyan", ["Up","Down","Left","Right"])
+#This loops forever to check if a player has hit a wall
+while True:
+    if p1.think() == False:
+        # If player1 hit a wall, then crash
+        board.reset()
+    
+    if p2.think() == False:
+        board.reset()
+
+    if p1.score >= 3 or p2.score >= 3:
+        break    
+    p1.move()
+    p2.move()
+    
+if p1.score == 3 or p2.score == 3:
+    print("GAME OVER!")
+    if p1.score > p2.score:
+        print("Player1 WINS!")
+    else:
+        print("Player2 WINS!")
+    #this resets the scores to 0 for both players and calls new game
+    #but I don't know how to get it to equal True again and reloop everything
+    board.scores[0].reset()
+    board.scores[1].reset()
+    board.new_game()
